@@ -16,15 +16,17 @@ from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
 
 class Cars(Agent):
-    def __init__(self, uniqueId, model):
+    def __init__(self, uniqueId, model, theChosenOne):
         super().__init__(uniqueId, model)
         self.speed = 4
-        self.wantChange = True
+        self.wantChange = False
         self.preference = np.random.choice([0,2])
+        self.locked = theChosenOne
+        self.stepStop = 6
         # OTHER ATTRIBBUTES #
 
     def checkSpeedFront(self, neighbor):
-        if neighbor.speed != self.speed and neighbor.speed >= 0:
+        if neighbor.speed != self.speed and neighbor.speed >= 0 and not self.locked:
             self.speed = neighbor.speed
             if self.pos[0] == 1 and self.speed <= 3:
                 self.wantChange = True
@@ -34,41 +36,52 @@ class Cars(Agent):
             if neighbor.pos[0] == 1:
                 self.speed = 3
 
+    def stopCar(self):
+        if self.stepStop % 2 == 0 and self.stepStop >= 0:
+            self.speed -= 1
+        if self.stepStop != -1:
+            self.stepStop -= 1
+
     def step(self):
         left = 0
         right = 0
         minfront = 5
         if self.pos != None:
-            for neighbor in self.model.grid.iter_neighbors(self.pos, moore = True, include_center = False, radius = 5):
-                x, y = neighbor.pos
-                if (x == self.pos[0] and (y <= (self.pos[1] + minfront) and y > self.pos[1])):
-                    minfront = y - self.pos[1]
-                    self.checkSpeedFront(neighbor)
-                if ((self.pos[0] == 0 or self.pos[0] == 2) and x == 1 and y >= (self.pos[1] + 1)):
-                    self.checkSpeedSide(neighbor)
-                if self.wantChange:
-                    if (x == 0 or x == 2) and (y <= self.pos[1] + 1):
+            if self.locked == True:
+                if self.pos[1] > self.model.grid.height/3:
+                    self.stopCar()
+                if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
+                    self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
+            else:
+                for neighbor in self.model.grid.iter_neighbors(self.pos, moore = True, include_center = False, radius = 5):
+                    x, y = neighbor.pos
+                    if (x == self.pos[0] and (y <= (self.pos[1] + minfront) and y > self.pos[1])):
+                        minfront = y - self.pos[1]
+                        self.checkSpeedFront(neighbor)
+                    if ((self.pos[0] == 0 or self.pos[0] == 2) and x == 1 and y >= (self.pos[1] + 1)):
+                        self.checkSpeedSide(neighbor)
+                    if self.pos[0] == 1 and (x == 0 or x == 2) and (y <= self.pos[1] + 1):
                         if x == 0:
                             left += 1
                         else:
                             right += 1
 
-            if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
-                if self.wantChange and (left == 0 or right == 0) and (self.pos[0] == 1) and (self.pos[1] > 20):
-                    if self.preference == 0:
-                        if left == 0:
-                            self.model.grid.move_agent(self, (0, self.pos[1] + 1))
+                if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
+                    if self.wantChange and (left == 0 or right == 0) and (self.pos[0] == 1):
+                        if self.preference == 0:
+                            if left == 0:
+                                self.model.grid.move_agent(self, (0, self.pos[1] + 1))
+                            else:
+                                self.model.grid.move_agent(self, (2, self.pos[1] + 1))
                         else:
-                            self.model.grid.move_agent(self, (2, self.pos[1] + 1))
+                            if right == 0:
+                                self.model.grid.move_agent(self, (2, self.pos[1] + 1))
+                            else:
+                                self.model.grid.move_agent(self, (0, self.pos[1] + 1))
                     else:
-                        if right == 0:
-                            self.model.grid.move_agent(self, (2, self.pos[1] + 1))
-                        else:
-                            self.model.grid.move_agent(self, (0, self.pos[1] + 1))
+                        self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
                 else:
-                    self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
-            else:
-                self.model.grid.remove_agent(self)
+                    self.model.grid.remove_agent(self)
 
 def getGrid(model):
     grid = np.zeros( (model.grid.width, model.grid.height) )
@@ -83,6 +96,8 @@ class Highway(Model):
     def __init__(self, numAgents):
         super().__init__()
         self.numAgents = numAgents
+        self.startAgents = numAgents
+        self.chosenchosen = False
         self.schedule = BaseScheduler(self)
         self.grid = SingleGrid(3, 300, False)
         self.datacollector = DataCollector(model_reporters={"Grid" : getGrid})
@@ -92,7 +107,11 @@ class Highway(Model):
             doI = np.random.choice([0,1,2,3,4])
             if doI == 2 or doI == 3:
                 lane = np.random.choice([0,1,2])
-                a = Cars(self.numAgents, self)
+                theChosen = False
+                if self.numAgents < self.startAgents/2 and lane == 1 and not self.chosenchosen:
+                    theChosen = True
+                    self.chosenchosen = True
+                a = Cars(self.numAgents, self, theChosen)
                 self.schedule.add(a)
                 self.grid.place_agent(a, (lane, 0))
                 self.numAgents -= 1
@@ -101,7 +120,7 @@ class Highway(Model):
 
 numAgents = 50
 model = Highway(numAgents)
-MAX_ITER = 100
+MAX_ITER = 200
 for i in range(MAX_ITER):
     model.step()
 
