@@ -45,6 +45,7 @@ class Cars(Agent):
     def step(self):
         left = 0
         right = 0
+        front = 0
         minfront = 5
         if self.pos != None:
             if self.locked == True:
@@ -55,9 +56,10 @@ class Cars(Agent):
             else:
                 for neighbor in self.model.grid.iter_neighbors(self.pos, moore = True, include_center = False, radius = 5):
                     x, y = neighbor.pos
-                    if (x == self.pos[0] and (y <= (self.pos[1] + minfront) and y > self.pos[1])):
+                    if ((x == self.pos[0]) and (y <= (self.pos[1] + minfront) and y > self.pos[1])):
                         minfront = y - self.pos[1]
                         self.checkSpeedFront(neighbor)
+                        front += 1
                     if ((self.pos[0] == 0 or self.pos[0] == 2) and x == 1 and y >= (self.pos[1] + 1)):
                         self.checkSpeedSide(neighbor)
                     if self.pos[0] == 1 and (x == 0 or x == 2) and (y <= self.pos[1] + 1):
@@ -65,7 +67,6 @@ class Cars(Agent):
                             left += 1
                         else:
                             right += 1
-
                 if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
                     if self.wantChange and (left == 0 or right == 0) and (self.pos[0] == 1):
                         if self.preference == 0:
@@ -78,10 +79,13 @@ class Cars(Agent):
                                 self.model.grid.move_agent(self, (2, self.pos[1] + 1))
                             else:
                                 self.model.grid.move_agent(self, (0, self.pos[1] + 1))
+                        self.speed = 2
                     else:
+                        if front == 0:
+                            self.speed = 4
                         self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
                 else:
-                    self.model.grid.remove_agent(self)
+                    self.model.grid.remove_agent(self)                
 
 def getGrid(model):
     grid = np.zeros( (model.grid.width, model.grid.height) )
@@ -105,6 +109,8 @@ class Highway(Model):
     def step(self):
         if self.numAgents > 0:
             doI = np.random.choice([0,1,2,3,4])
+            if self.numAgents == self.startAgents:
+                doI = 2
             if doI == 2 or doI == 3:
                 lane = np.random.choice([0,1,2])
                 theChosen = False
