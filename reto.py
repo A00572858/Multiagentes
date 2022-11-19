@@ -14,6 +14,11 @@ from mesa import Model
 from mesa.space import SingleGrid
 from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
+from threading import Timer
+
+# --------------------------------------------- #
+# ------------------- AGENT ------------------- #
+# --------------------------------------------- #
 
 class Cars(Agent):
     def __init__(self, uniqueId, model, theChosenOne):
@@ -23,7 +28,6 @@ class Cars(Agent):
         self.preference = np.random.choice([0,2])
         self.locked = theChosenOne
         self.stepStop = 6
-        # OTHER ATTRIBBUTES #
 
     def checkSpeedFront(self, neighbor):
         if neighbor.speed != self.speed and neighbor.speed >= 0 and not self.locked:
@@ -85,7 +89,12 @@ class Cars(Agent):
                             self.speed = 4
                         self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
                 else:
-                    self.model.grid.remove_agent(self)                
+                    self.model.grid.remove_agent(self)
+                    self.model.flux += 1            
+
+# --------------------------------------------- #
+# ----------- GET GRID FOR ANIMATION ---------- #
+# --------------------------------------------- #
 
 def getGrid(model):
     grid = np.zeros( (model.grid.width, model.grid.height) )
@@ -96,39 +105,75 @@ def getGrid(model):
             grid[x][y] = 1
     return grid
 
+# --------------------------------------------- #
+# ------------------- MODEL ------------------- #
+# --------------------------------------------- #
+
 class Highway(Model):
-    def __init__(self, numAgents):
+    def __init__(self, time, timeStop, SPP):
         super().__init__()
-        self.numAgents = numAgents
-        self.startAgents = numAgents
+        self.time = time
+        self.startTime = time
         self.chosenchosen = False
+        self.timeStop = timeStop
+        self.flux = 0
+        self.fluxAux = 0
+        self.SPP = SPP
+
         self.schedule = BaseScheduler(self)
         self.grid = SingleGrid(3, 300, False)
         self.datacollector = DataCollector(model_reporters={"Grid" : getGrid})
 
     def step(self):
-        if self.numAgents > 0:
+        if self.time > 0:
             doI = np.random.choice([0,1,2,3,4])
-            if self.numAgents == self.startAgents:
-                doI = 2
-            if doI == 2 or doI == 3:
+            if doI == 2 or doI == 3 or self.time == self.startTime:
                 lane = np.random.choice([0,1,2])
                 theChosen = False
-                if self.numAgents < self.startAgents/2 and lane == 1 and not self.chosenchosen:
+                if (self.time <= (self.startTime - self.timeStop)) and lane == 1 and not self.chosenchosen:
                     theChosen = True
                     self.chosenchosen = True
-                a = Cars(self.numAgents, self, theChosen)
+                a = Cars(self.time, self, theChosen)
                 self.schedule.add(a)
                 self.grid.place_agent(a, (lane, 0))
-                self.numAgents -= 1
+            self.time -= 1
+            if self.time % self.SPP == self.SPP:
+                print(self.time)
+                self.flux = 0
         self.datacollector.collect(self)
         self.schedule.step()
 
-numAgents = 50
-model = Highway(numAgents)
-MAX_ITER = 200
-for i in range(MAX_ITER):
-    model.step()
+# --------------------------------------------- #
+# ------------- INITIAL VARIABLES ------------- #
+# --------------------------------------------- #
+
+MAX_TIME_SECS = 30
+STEPS_PER_SECOND = 5
+TIME_STOP = 10
+
+# --------------------------------------------- #
+# -- INITIALIZATION AND DEVELOPMENT OF MODEL -- #
+# --------------------------------------------- #
+
+totalSteps = MAX_TIME_SECS * STEPS_PER_SECOND
+last_step_time = 0
+fraction = STEPS_PER_SECOND / 1
+
+allFluxes = []
+
+model = Highway(totalSteps, (STEPS_PER_SECOND * TIME_STOP), STEPS_PER_SECOND)
+for i in range(totalSteps):
+    timer = Timer(fraction, model.step())
+    if i % STEPS_PER_SECOND == 0:
+        allFluxes.append(model.flux)
+        fluxPerSecond = model.flux
+        print("Flujo promedio al segundo ", (i // STEPS_PER_SECOND) + 1, " = ", fluxPerSecond)
+
+print("Flujo promedio = ", np.average(allFluxes))
+
+# --------------------------------------------- #
+# ----------------- ANIMATION ----------------- #
+# --------------------------------------------- #
 
 allGrid = model.datacollector.get_model_vars_dataframe()
 fig, axs = plt.subplots(figsize = (18, 4))
@@ -139,5 +184,5 @@ patch = plt.imshow(allGrid.iloc[0][0], cmap=plt.cm.binary)
 def animate(i):
     patch.set_data(allGrid.iloc[i][0])
 
-anim = animation.FuncAnimation(fig, animate, frames=MAX_ITER)
+anim = animation.FuncAnimation(fig, animate, frames=totalSteps)
 plt.show()
