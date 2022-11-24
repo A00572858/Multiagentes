@@ -14,7 +14,32 @@ from mesa import Model
 from mesa.space import SingleGrid
 from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
+
 from threading import Timer
+
+import json
+
+# --------------------------------------------- #
+# -------------------- API -------------------- #
+# --------------------------------------------- #
+
+def UNITY_GET(model):
+
+    varsthingy = {}
+    for agent in model.schedule.agent_buffer(False):
+        if agent.pos != None:
+            lane = agent.pos[0]
+        else:
+            lane = None
+        varsthingy[agent.unique_id] = {
+            "id" : str(agent.unique_id),
+            "speed" : str(agent.speed),
+            "lane" : str(lane)
+        }
+
+    jsonOut = json.dumps(varsthingy, sort_keys=True)
+
+    return jsonOut
 
 # --------------------------------------------- #
 # ------------------- AGENT ------------------- #
@@ -164,16 +189,19 @@ allFluxes = []
 model = Highway(totalSteps, (STEPS_PER_SECOND * TIME_STOP), STEPS_PER_SECOND)
 for i in range(totalSteps):
     timer = Timer(fraction, model.step())
+    print(UNITY_GET(model))
     if i % STEPS_PER_SECOND == 0:
         allFluxes.append(model.flux)
         fluxPerSecond = model.flux
-        print("Flujo promedio al segundo ", (i // STEPS_PER_SECOND) + 1, " = ", fluxPerSecond)
+        #print("Flujo promedio al segundo ", (i // STEPS_PER_SECOND) + 1, " = ", fluxPerSecond)
 
-print("Flujo promedio = ", np.average(allFluxes))
+#print("Flujo promedio = ", np.average(allFluxes))
 
 # --------------------------------------------- #
 # ----------------- ANIMATION ----------------- #
 # --------------------------------------------- #
+
+# UNITY_GET(model)
 
 allGrid = model.datacollector.get_model_vars_dataframe()
 fig, axs = plt.subplots(figsize = (18, 4))
