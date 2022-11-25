@@ -30,11 +30,11 @@ def UNITY_GET(model):
         if agent.pos != None:
             lane = agent.pos[0]
         else:
-            lane = None
+            lane = -1
         varsthingy[agent.unique_id] = {
-            "id" : str(agent.unique_id),
-            "speed" : str(agent.speed),
-            "lane" : str(lane)
+            "id" : agent.unique_id,
+            "speed" : agent.speed,
+            "lane" : int(lane)
         }
 
     jsonOut = json.dumps(varsthingy, sort_keys=True)
@@ -75,15 +75,15 @@ class Cars(Agent):
         left = 0
         right = 0
         front = 0
-        minfront = 5
+        minfront = 5 * self.model.SPP
         if self.pos != None:
             if self.locked == True:
-                if self.pos[1] > self.model.grid.height/3:
+                if self.pos[1] > 400:
                     self.stopCar()
                 if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
                     self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
             else:
-                for neighbor in self.model.grid.iter_neighbors(self.pos, moore = True, include_center = False, radius = 5):
+                for neighbor in self.model.grid.iter_neighbors(self.pos, moore = True, include_center = False, radius = 5 * self.model.SPP):
                     x, y = neighbor.pos
                     if ((x == self.pos[0]) and (y <= (self.pos[1] + minfront) and y > self.pos[1])):
                         minfront = y - self.pos[1]
@@ -114,8 +114,7 @@ class Cars(Agent):
                             self.speed = 4
                         self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
                 else:
-                    self.model.grid.remove_agent(self)
-                    self.model.flux += 1            
+                    self.model.grid.remove_agent(self)      
 
 # --------------------------------------------- #
 # ----------- GET GRID FOR ANIMATION ---------- #
@@ -141,12 +140,10 @@ class Highway(Model):
         self.startTime = time
         self.chosenchosen = False
         self.timeStop = timeStop
-        self.flux = 0
-        self.fluxAux = 0
         self.SPP = SPP
 
         self.schedule = BaseScheduler(self)
-        self.grid = SingleGrid(3, 300, False)
+        self.grid = SingleGrid(3, 1000, False)
         self.datacollector = DataCollector(model_reporters={"Grid" : getGrid})
 
     def step(self):
@@ -162,9 +159,6 @@ class Highway(Model):
                 self.schedule.add(a)
                 self.grid.place_agent(a, (lane, 0))
             self.time -= 1
-            if self.time % self.SPP == self.SPP:
-                print(self.time)
-                self.flux = 0
         self.datacollector.collect(self)
         self.schedule.step()
 
@@ -173,8 +167,8 @@ class Highway(Model):
 # --------------------------------------------- #
 
 MAX_TIME_SECS = 30
-STEPS_PER_SECOND = 5
-TIME_STOP = 10
+STEPS_PER_SECOND = 4
+TIME_STOP = 5
 
 # --------------------------------------------- #
 # -- INITIALIZATION AND DEVELOPMENT OF MODEL -- #
@@ -182,26 +176,16 @@ TIME_STOP = 10
 
 totalSteps = MAX_TIME_SECS * STEPS_PER_SECOND
 last_step_time = 0
-fraction = STEPS_PER_SECOND / 1
-
-allFluxes = []
+fraction = 1 / STEPS_PER_SECOND
 
 model = Highway(totalSteps, (STEPS_PER_SECOND * TIME_STOP), STEPS_PER_SECOND)
 for i in range(totalSteps):
     timer = Timer(fraction, model.step())
     print(UNITY_GET(model))
-    if i % STEPS_PER_SECOND == 0:
-        allFluxes.append(model.flux)
-        fluxPerSecond = model.flux
-        #print("Flujo promedio al segundo ", (i // STEPS_PER_SECOND) + 1, " = ", fluxPerSecond)
-
-#print("Flujo promedio = ", np.average(allFluxes))
 
 # --------------------------------------------- #
 # ----------------- ANIMATION ----------------- #
 # --------------------------------------------- #
-
-# UNITY_GET(model)
 
 allGrid = model.datacollector.get_model_vars_dataframe()
 fig, axs = plt.subplots(figsize = (18, 4))
