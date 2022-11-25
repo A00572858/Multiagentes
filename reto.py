@@ -170,19 +170,26 @@ import logging
 
 def UNITY_GET(model):
 
-    varsthingy = {}
+    # varsthingy = {}
+    listthingy = []
     for agent in model.schedule.agent_buffer(False):
         if agent.pos != None:
             lane = agent.pos[0]
         else:
             lane = -1
-        varsthingy[agent.unique_id] = {
+        # varsthingy[agent.unique_id] = {
+        #     "id" : agent.unique_id,
+        #     "speed" : agent.speed,
+        #     "lane" : int(lane)
+        # }
+        aux = {
             "id" : agent.unique_id,
             "speed" : agent.speed,
             "lane" : int(lane)
         }
+        listthingy.append(aux)
 
-    jsonOut = json.dumps(varsthingy, sort_keys=True)
+    jsonOut = json.dumps(listthingy, sort_keys=True)
 
     model.step()
 
