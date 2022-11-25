@@ -188,8 +188,12 @@ def UNITY_GET(model):
             "lane" : int(lane)
         }
         listthingy.append(aux)
+    
+    vars = {
+        "agents" : listthingy
+    }
 
-    jsonOut = json.dumps(listthingy, sort_keys=True)
+    jsonOut = json.dumps(vars, sort_keys=True)
 
     model.step()
 
