@@ -48,6 +48,8 @@ class Cars(Agent):
             self.speed -= 1
         if self.stepStop != -1:
             self.stepStop -= 1
+        else:
+            self.model.warning = True
 
     def step(self):
         left = 0
@@ -56,7 +58,7 @@ class Cars(Agent):
         minfront = 5 * self.model.SPP
         if self.pos != None:
             if self.locked == True:
-                if self.pos[1] > 400:
+                if self.pos[1] > (self.model.grid.height * 0.4):
                     self.stopCar()
                 if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
                     self.model.grid.move_agent(self, (self.pos[0], self.pos[1] + self.speed))
@@ -75,7 +77,7 @@ class Cars(Agent):
                         else:
                             right += 1
                 if not (self.model.grid.out_of_bounds((self.pos[0], self.pos[1] + self.speed))):
-                    if self.wantChange and (left == 0 or right == 0) and (self.pos[0] == 1):
+                    if (self.wantChange or (self.model.warning and (self.pos[1] >= self.model.grid.height * 0.1))) and (left == 0 or right == 0) and (self.pos[0] == 1):
                         if self.preference == 0:
                             if left == 0:
                                 self.model.grid.move_agent(self, (0, self.pos[1] + 1))
@@ -119,9 +121,10 @@ class Highway(Model):
         self.chosenchosen = False
         self.timeStop = timeStop
         self.SPP = SPP
+        self.warning = False
 
         self.schedule = BaseScheduler(self)
-        self.grid = SingleGrid(3, 1000, False)
+        self.grid = SingleGrid(3, 500, False)
         self.datacollector = DataCollector(model_reporters={"Grid" : getGrid})
 
     def step(self):
@@ -144,8 +147,8 @@ class Highway(Model):
 # ------------- INITIAL VARIABLES ------------- #
 # --------------------------------------------- #
 
-MAX_TIME_SECS = 30
-STEPS_PER_SECOND = 4
+MAX_TIME_SECS = 60
+STEPS_PER_SECOND = 2
 TIME_STOP = 5
 
 # --------------------------------------------- #
@@ -157,111 +160,94 @@ last_step_time = 0
 fraction = 1 / STEPS_PER_SECOND
 
 model = Highway(totalSteps, (STEPS_PER_SECOND * TIME_STOP), STEPS_PER_SECOND)
-# for i in range(totalSteps):
-#     timer = Timer(fraction, model.step())
-#     print(UNITY_GET(model))
+for i in range(totalSteps):
+    timer = Timer(fraction, model.step())
+    # print(UNITY_GET(model))
 
 # --------------------------------------------- #
 # -------------------- API -------------------- #
 # --------------------------------------------- #
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import logging
+# from http.server import BaseHTTPRequestHandler, HTTPServer
+# import logging
 
-def UNITY_GET(model):
+# def UNITY_GET(model):
 
-    # varsthingy = {}
-    listthingy = []
-    for agent in model.schedule.agent_buffer(False):
-        if agent.pos != None:
-            lane = agent.pos[0]
-        else:
-            lane = -1
-        # varsthingy[agent.unique_id] = {
-        #     "id" : agent.unique_id,
-        #     "speed" : agent.speed,
-        #     "lane" : int(lane)
-        # }
-        aux = {
-            "id" : agent.unique_id,
-            "speed" : agent.speed,
-            "lane" : int(lane)
-        }
-        listthingy.append(aux)
+#     # varsthingy = {}
+#     listthingy = []
+#     for agent in model.schedule.agent_buffer(False):
+#         if agent.pos != None:
+#             lane = agent.pos[0]
+#         else:
+#             lane = -1
+#         # varsthingy[agent.unique_id] = {
+#         #     "id" : agent.unique_id,
+#         #     "speed" : agent.speed,
+#         #     "lane" : int(lane)
+#         # }
+#         aux = {
+#             "id" : agent.unique_id,
+#             "speed" : agent.speed,
+#             "lane" : int(lane)
+#         }
+#         listthingy.append(aux)
     
-    vars = {
-        "agents" : listthingy
-    }
+#     vars = {
+#         "agents" : listthingy
+#     }
 
-    jsonOut = json.dumps(vars, sort_keys=True)
+#     jsonOut = json.dumps(vars, sort_keys=True)
 
-    model.step()
+#     model.step()
 
-    return jsonOut
+#     return jsonOut
 
-class Server(BaseHTTPRequestHandler):
-    def _set_response(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
+# class Server(BaseHTTPRequestHandler):
+#     def _set_response(self):
+#         self.send_response(200)
+#         self.send_header('Content-type', 'text/html')
+#         self.end_headers()
         
-    def do_GET(self):
-        logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
-        jsonOut = UNITY_GET(model)
+#     def do_GET(self):
+#         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
+#         jsonOut = UNITY_GET(model)
         
-        self._set_response()
+#         self._set_response()
         
-        self.wfile.write(str(jsonOut).encode('utf-8'))
-        # self._set_response()
-        # self.wfile.write("GET request for {}".format(self.path).encode('utf-8'))
+#         self.wfile.write(str(jsonOut).encode('utf-8'))
+
+# def run(server_class=HTTPServer, handler_class=Server, port=8585):
+#     logging.basicConfig(level=logging.INFO)
+#     server_address = ('', port)
+#     httpd = server_class(server_address, handler_class)
+#     logging.info("Starting httpd...\n") # HTTPD is HTTP Daemon!
+#     try:
+#         httpd.serve_forever()
+#     except KeyboardInterrupt:   # CTRL+C stops the server
+#         pass
+#     httpd.server_close()
+#     logging.info("Stopping httpd...\n")
+
+# if __name__ == '__main__':
+#     from sys import argv
     
-    # def do_POST(self):
-    #     content_length = int(self.headers['Content-Length'])
-    #     #post_data = self.rfile.read(content_length)
-    #     post_data = json.loads(self.rfile.read(content_length))
-    #     #logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
-    #                 #str(self.path), str(self.headers), post_data.decode('utf-8'))
-    #     logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
-    #                 str(self.path), str(self.headers), json.dumps(post_data))
-
-    #     jsonOut = UNITY_GET(model)
-        
-    #     self._set_response()
-
-    #     self.wfile.write(str(jsonOut).encode('utf-8'))
-
-def run(server_class=HTTPServer, handler_class=Server, port=8585):
-    logging.basicConfig(level=logging.INFO)
-    server_address = ('', port)
-    httpd = server_class(server_address, handler_class)
-    logging.info("Starting httpd...\n") # HTTPD is HTTP Daemon!
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:   # CTRL+C stops the server
-        pass
-    httpd.server_close()
-    logging.info("Stopping httpd...\n")
-
-if __name__ == '__main__':
-    from sys import argv
-    
-    if len(argv) == 2:
-        run(port=int(argv[1]))
-    else:
-        run()
+#     if len(argv) == 2:
+#         run(port=int(argv[1]))
+#     else:
+#         run()
 
 # --------------------------------------------- #
 # ----------------- ANIMATION ----------------- #
 # --------------------------------------------- #
 
-# allGrid = model.datacollector.get_model_vars_dataframe()
-# fig, axs = plt.subplots(figsize = (18, 4))
-# axs.set_xticks([])
-# axs.set_yticks([])
-# patch = plt.imshow(allGrid.iloc[0][0], cmap=plt.cm.binary)
+allGrid = model.datacollector.get_model_vars_dataframe()
+fig, axs = plt.subplots(figsize = (18, 4))
+axs.set_xticks([])
+axs.set_yticks([])
+patch = plt.imshow(allGrid.iloc[0][0], cmap=plt.cm.binary)
 
-# def animate(i):
-#     patch.set_data(allGrid.iloc[i][0])
+def animate(i):
+    patch.set_data(allGrid.iloc[i][0])
 
-# anim = animation.FuncAnimation(fig, animate, frames=totalSteps)
-# plt.show()
+anim = animation.FuncAnimation(fig, animate, frames=totalSteps)
+plt.show()
