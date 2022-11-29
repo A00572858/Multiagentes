@@ -157,8 +157,8 @@ last_step_time = 0
 fraction = 1 / STEPS_PER_SECOND
 
 model = Highway(totalSteps, (STEPS_PER_SECOND * TIME_STOP), STEPS_PER_SECOND)
-for i in range(totalSteps):
-    timer = Timer(fraction, model.step())
+# for i in range(totalSteps):
+#     timer = Timer(fraction, model.step())
     # print(UNITY_GET(model))
 
 # --------------------------------------------- #
